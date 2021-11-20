@@ -1,14 +1,24 @@
+(******************************************)
+(*              ZADANIE ISET              *)
+(*        ROZWIAZANIE: MARCIN ZOLEK       *)
+(*          RIWJU: JAKUB KLIMEK           *)
+(******************************************)
+
 type t = Empty | Node of int * int * t * t * int * int
-(* poczatek przedzialu, koniec przedzialu, 
-lewe poddrzewo, prawe poddrzewo,
-wysokosc poddrzewa, 
-suma dlugosci przedzialow w poddrzewie *)
 
 let plus n m =
     if n > max_int - m then
         max_int
     else
         n + m
+        
+let distance a b =
+    if (a >= 0 && b >= 0 && -a > max_int - 1 - b)
+    || (a < 0 && 0 < b && -(a + 1) > max_int - b - 2) 
+    || (a <= 0 && b <= 0 && b > max_int - 1 + a) then
+        max_int
+    else
+        b - a + 1
     
 let height = function
     | Empty -> 0
@@ -19,7 +29,7 @@ let length = function
     | Node (_, _, _, _, _, l) -> l
     
 let make a b l r =
-    Node (a, b, l, r, max (height l) (height r) + 1, plus (plus (length l) (length r)) (b - a + 1))
+    Node (a, b, l, r, max (height l) (height r) + 1, plus (plus (length l) (length r)) (distance a b))
 
 let balance a b l r =
     let hl = height l in
@@ -53,7 +63,7 @@ let rec min_elt = function
     | Node (a, b, Empty, _, _, _) -> (a, b)
     | Node (_, _, l, _, _, _) -> min_elt l
 
-let rec remove_min_elt = function
+let rec remove_min_elt = function 
     | Empty -> invalid_arg "ISet.remove_min_elt"
     | Node (_, _, Empty, r, _, _) -> r
     | Node (a, b, l, r, _, _) -> balance a b (remove_min_elt l) r
@@ -127,6 +137,18 @@ let pre_remove a b set =
                 ((c, a - 1)::(b + 1, d)::lsta, (c, d)::lstr)
     in
     aux ([], []) set
+    
+let rec join a b l r =
+    match (l, r) with
+    | (Empty, _) -> add_one a b r
+    | (_, Empty) -> add_one a b l
+    | (Node (la, lb, ll, lr, lh, _), Node (ra, rb, rl, rr, rh, _)) ->
+        if lh > rh + 2 then 
+            balance la lb ll (join a b lr r) 
+        else if rh > lh + 2 then 
+            balance ra rb (join a b l rl) rr
+        else
+            make a b l r
             
 let empty =
     Empty
@@ -184,8 +206,29 @@ let below n set =
             if n < a then
                 aux l acc
             else if a <= n && n <= b then
-                plus acc (plus (length l) (n - a + 1))
+                plus acc (plus (length l) (distance a n))
             else
-                aux r (plus acc (plus (length l) (b - a + 1)))
+                aux r (plus acc (plus (length l) (distance a b)))
     in
     aux set 0
+
+let split n set =
+    let rec aux = function
+        | Empty -> (Empty, false, Empty)
+        | Node (a, b, l, r, _, _) ->
+            if n < a then
+                let (ll, pres, lr) = aux l in
+                (ll, pres, join a b lr r)
+            else if b < n then
+                let (rl, pres, rr) = aux r in
+                (join a b l rl, pres, rr)
+            else if a = n && n < b then 
+                (l, true, add_one (n + 1) b r)
+            else if a = n && n = b then
+                (l, true, r)
+            else if a < n && n = b then
+                (add_one a (n - 1) l, true, r)
+            else 
+                (add_one a (n - 1) l, true, add_one (n + 1) b r)
+    in
+    aux set
