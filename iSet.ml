@@ -1,18 +1,22 @@
 (******************************************)
-(*              ZADANIE ISET              *)
+(*             ZADANIE ISET               *)
 (*        ROZWIAZANIE: MARCIN ZOLEK       *)
 (*          RIWJU: JAKUB KLIMEK           *)
 (******************************************)
 
 type t = Empty | Node of int * int * t * t * int * int
+(** typ t jest pustym poddrzewem (Empty) albo niepustym poddrzewem (Node) 
+i wtedy składa sie z lewego końca przedziału, prawego końca przedziału,
+lewego poddrzewa, prawego poddrzewa, wysokości poddrzewa,
+sumy długości przedziałów w poddrzewie *) 
 
-let plus n m =
+let plus n m = (** min (n + m) max_int *)
     if n > max_int - m then
         max_int
     else
         n + m
         
-let distance a b =
+let distance a b = (** min (b - a + 1) max_int *)
     if (a >= 0 && b >= 0 && -a > max_int - 1 - b)
     || (a < 0 && 0 < b && -(a + 1) > max_int - b - 2) 
     || (a <= 0 && b <= 0 && b > max_int - 1 + a) then
@@ -77,6 +81,7 @@ let merge set1 set2 =
         balance a b set1 (remove_min_elt set2)
 
 let add_one a b set = 
+    (** dodaje wierzchołek reprezentujący przedział [a, b] do drzewa, w którym nie ma elementów z [a - 1, b + 1] *)
     let rec aux = function
         | Empty -> make a b Empty Empty
         | Node (c, d, l, r, _, _) ->
@@ -87,7 +92,8 @@ let add_one a b set =
     in 
     aux set
 
-let remove_one a b set =
+let remove_one a b set = 
+    (** usuwa z drzewa wierzchołek reprezentujący przedział [a, b] *)
     let rec aux = function
         | Empty -> Empty 
         | Node (c, d, l, r, _, _) ->
@@ -100,8 +106,12 @@ let remove_one a b set =
     in
     aux set
 
-let pre_add a b set =
-    let rec aux (min_a, max_b, lst) = function
+let pre_add a b set = 
+    let rec aux (min_a, max_b, lst) = function 
+        (** oblicza (min_a, max_b, lst) takie, że
+        min_a jest minimalnym lewym końcem przedziału, ktory nachodzi na [a, b];
+        max_b jest maksymalnym końcem przedziału, który nachodzi na [a, b];
+        lst jest listą przedziałów w drzewie, które nachodzą na [a, b] *)
         | Empty -> (min_a, max_b, lst)
         | Node (c, d, l, r, _, _) ->
             if plus d 1 < a then
@@ -121,6 +131,12 @@ let pre_add a b set =
 
 let pre_remove a b set =
     let rec aux (lsta, lstr) = function
+        (** oblicza (lsta, lstr) takie, że 
+        lstr jest listą przedziałów nachodzących na [a, b], czyli takich, 
+        które trzeba będzie potem usunąć, długość lsta może być maksymalnie 2,
+        bo może do niej należeć tylko przedział nachodzący od lewej na [a, b] lub od prawej;
+        lsta jest listą przedziałów, które trzeba będzie potem dodać do drzewa, 
+        po usunięciu wierzchołków z lstr *)
         | Empty -> (lsta, lstr)
         | Node (c, d, l, r, _, _) ->
             if d < a then
@@ -158,10 +174,12 @@ let is_empty set =
 
 let add (a, b) set = 
     let (c, d, lst) = pre_add a b set in
+    (** usuwa z drzewa przedziały z lst i dodaje przedział [c, d] *)
     add_one c d (List.fold_left (fun acc h -> remove_one (fst h) (snd h) acc) set lst)
     
 let remove (a, b) set = 
     let (lsta, lstr) = pre_remove a b set in
+    (** usuwa z drzewa przedziały z lstr i dodaje przedziały z lsta *)
     List.fold_left (fun acc h -> add_one (fst h) (snd h) acc) (List.fold_left (fun a h -> remove_one (fst h) (snd h) a) set lstr) lsta
 
 let mem n set =
