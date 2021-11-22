@@ -1,6 +1,6 @@
 (******************************************)
 (*             ZADANIE ISET               *)
-(*        ROZWIAZANIE: MARCIN ZOLEK       *)
+(*        ROZWIĄZANIE: MARCIN ŻOŁEK       *)
 (*          RIWJU: JAKUB KLIMEK           *)
 (******************************************)
 
