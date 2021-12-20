@@ -1,12 +1,12 @@
 (******************************************)
 (*             ZADANIE ISET               *)
-(*        ROZWIĄZANIE: MARCIN ŻOŁEK       *)
+(*        ROZWIAZANIE: MARCIN ŻOŁEK       *)
 (*          RIWJU: JAKUB KLIMEK           *)
 (******************************************)
 
 type t = Empty | Node of int * int * t * t * int * int
 (** typ t jest pustym poddrzewem (Empty) albo niepustym poddrzewem (Node) 
-i wtedy składa sie z lewego końca przedziału, prawego końca przedziału,
+i wtedy składa się z lewego końca przedziału, prawego końca przedziału,
 lewego poddrzewa, prawego poddrzewa, wysokości poddrzewa,
 sumy długości przedziałów w poddrzewie *) 
 
@@ -92,67 +92,30 @@ let add_one a b set =
     in 
     aux set
 
-let remove_one a b set = 
-    (** usuwa z drzewa wierzchołek reprezentujący przedział [a, b] *)
-    let rec aux = function
-        | Empty -> Empty 
-        | Node (c, d, l, r, _, _) ->
-            if a = c && b = d then 
-                merge l r 
-            else if a < c then 
-                balance c d (aux l) r 
-            else 
-                balance c d l (aux r)
-    in
-    aux set
-
 let pre_add a b set = 
-    let rec aux (min_a, max_b, lst) = function 
-        (** oblicza (min_a, max_b, lst) takie, że
-        min_a jest minimalnym lewym końcem przedziału, ktory nachodzi na [a, b];
-        max_b jest maksymalnym końcem przedziału, który nachodzi na [a, b];
-        lst jest listą przedziałów w drzewie, które nachodzą na [a, b] *)
-        | Empty -> (min_a, max_b, lst)
+    let rec aux_min min_a = function
+        (** oblicza min_a takie, że jest minimalnym lewym końcem przedziału, ktory nachodzi na [a, b] *)
+        | Empty -> min_a
         | Node (c, d, l, r, _, _) ->
             if plus d 1 < a then
-                aux (min_a, max_b, lst) r
-            else if c <= a && a <= plus d 1 && d < b then
-                aux (c, max_b, (c, d)::lst) r
-            else if a < c && d < b then
-                aux (aux (min_a, max_b, (c, d)::lst) r) l
-            else if a < c && c <= plus b 1 && b <= d then
-                aux (min_a, d, (c, d)::lst) l
-            else if plus b 1 < c then
-                aux (min_a, max_b, lst) l
+                aux_min min_a r
+            else if a < c then
+                aux_min min_a l
             else
-                (c, d, (c, d)::lst)
+                c
     in
-    aux (a, b, []) set
-
-let pre_remove a b set =
-    let rec aux (lsta, lstr) = function
-        (** oblicza (lsta, lstr) takie, że 
-        lstr jest listą przedziałów nachodzących na [a, b], czyli takich, 
-        które trzeba będzie potem usunąć, długość lsta może być maksymalnie 2,
-        bo może do niej należeć tylko przedział nachodzący od lewej na [a, b] lub od prawej;
-        lsta jest listą przedziałów, które trzeba będzie potem dodać do drzewa, 
-        po usunięciu wierzchołków z lstr *)
-        | Empty -> (lsta, lstr)
+    let rec aux_max max_b = function
+        (** obicza max_b takie, że jest maksymalnym końcem przedziału, który nachodzi na [a, b] *)
+        | Empty -> max_b
         | Node (c, d, l, r, _, _) ->
-            if d < a then
-                aux (lsta, lstr) r
-            else if c < a && a <= d && d <= b then
-                aux ((c, a - 1)::lsta, (c, d)::lstr) r
-            else if a <= c && d <= b then
-                aux (aux (lsta, (c, d)::lstr) r) l
-            else if a <= c && c <= b && b < d then
-                aux ((b + 1, d)::lsta, (c, d)::lstr) l
-            else if b < c then
-                aux (lsta, lstr) l
+            if d < b then
+                aux_max max_b r
+            else if plus b 1 < c then
+                aux_max max_b l
             else 
-                ((c, a - 1)::(b + 1, d)::lsta, (c, d)::lstr)
+                d
     in
-    aux ([], []) set
+    (aux_min a set, aux_max b set)
     
 let rec join a b l r =
     match (l, r) with
@@ -171,16 +134,50 @@ let empty =
 
 let is_empty set =
     set = Empty
+    
+let split n set =
+    let rec aux = function
+        | Empty -> (Empty, false, Empty)
+        | Node (a, b, l, r, _, _) ->
+            if n < a then
+                let (ll, pres, lr) = aux l in
+                (ll, pres, join a b lr r)
+            else if b < n then
+                let (rl, pres, rr) = aux r in
+                (join a b l rl, pres, rr)
+            else if a = n && n < b then 
+                (l, true, add_one (n + 1) b r)
+            else if a = n && n = b then
+                (l, true, r)
+            else if a < n && n = b then
+                (add_one a (n - 1) l, true, r)
+            else 
+                (add_one a (n - 1) l, true, add_one (n + 1) b r)
+    in
+    aux set
 
 let add (a, b) set = 
-    let (c, d, lst) = pre_add a b set in
-    (** usuwa z drzewa przedziały z lst i dodaje przedział [c, d] *)
-    add_one c d (List.fold_left (fun acc h -> remove_one (fst h) (snd h) acc) set lst)
+    (** znajduje przedział do dodania *)
+    let (c, d) = pre_add a b set in
+    (** tworzy drzewo z przedziałami ostro mniejszymi od c *)
+    let (l, _, _) = split c set in
+    (** tworzy drzewo z przedziałami ostro większymi od d *)
+    let (_, _, r) = split d set in
+    (** łączy te dwa drzewa *)
+    join c d l r
     
 let remove (a, b) set = 
-    let (lsta, lstr) = pre_remove a b set in
-    (** usuwa z drzewa przedziały z lstr i dodaje przedziały z lsta *)
-    List.fold_left (fun acc h -> add_one (fst h) (snd h) acc) (List.fold_left (fun a h -> remove_one (fst h) (snd h) a) set lstr) lsta
+    (** tworzy drzewo z przedziałami ostro mniejszymi od a *)
+    let (l, _, _) = split a set in
+    (** tworzy drzewo z przedziałami ostro większymi od b *)
+    let (_, _, r) = split b set in
+    (** łączy te dwa drzewa *)
+    match (l, r) with
+    | (Empty, _) -> r
+    | (_, Empty) -> l
+    | (_, _) -> 
+        let (c, d) = min_elt r in
+        join c d l (remove_min_elt r)
 
 let mem n set =
     let rec aux = function
@@ -212,7 +209,7 @@ let fold f set acc =
 let elements set = 
     let rec aux acc = function
         | Empty -> acc
-        | Node (a, b, l, r, _, _) -> aux ((a, b)::(aux acc r)) l
+        | Node (a, b, l, r, _, _) -> aux ((a, b) :: (aux acc r)) l
     in
     aux [] set
     
@@ -229,24 +226,3 @@ let below n set =
                 aux r (plus acc (plus (length l) (distance a b)))
     in
     aux set 0
-
-let split n set =
-    let rec aux = function
-        | Empty -> (Empty, false, Empty)
-        | Node (a, b, l, r, _, _) ->
-            if n < a then
-                let (ll, pres, lr) = aux l in
-                (ll, pres, join a b lr r)
-            else if b < n then
-                let (rl, pres, rr) = aux r in
-                (join a b l rl, pres, rr)
-            else if a = n && n < b then 
-                (l, true, add_one (n + 1) b r)
-            else if a = n && n = b then
-                (l, true, r)
-            else if a < n && n = b then
-                (add_one a (n - 1) l, true, r)
-            else 
-                (add_one a (n - 1) l, true, add_one (n + 1) b r)
-    in
-    aux set
